@@ -8,8 +8,8 @@
     "name": "Seungwan Yoo",
     "url": "https://github.com/ysw789"
   },
-  "homepage": "https://github.com/ysw789/notion-passport-claude-code",
-  "repository": "https://github.com/ysw789/notion-passport-claude-code",
+  "homepage": "https://github.com/notion-passport/notion-passport-claude-code",
+  "repository": "https://github.com/notion-passport/notion-passport-claude-code",
   "license": "MIT",
   "keywords": ["notion", "mcp", "workspace", "per-project", "oauth"]
 }

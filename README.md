@@ -38,7 +38,7 @@
 ## 설치
 
 ```
-/plugin marketplace add ysw789/notion-passport-claude-code
+/plugin marketplace add notion-passport/notion-passport-claude-code
 /plugin install notion-passport@notion-passport
 ```
 
