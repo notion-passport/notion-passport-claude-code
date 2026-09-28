@@ -4,12 +4,12 @@
   "owner": {
     "name": "Seungwan Yoo"
   },
-  "description": "Connect each project to its own Notion workspace.",
+  "description": "Connect multiple Notion workspaces to each project.",
   "plugins": [
     {
       "name": "notion-passport",
       "source": "./plugins/notion-passport-claude-code",
-      "description": "Give each repo its own Notion workspace instead of sharing one.",
+      "description": "Connect one or more Notion workspaces to each repo, each with its own OAuth.",
       "category": "productivity",
       "keywords": ["notion", "mcp", "workspace", "per-project"]
     }

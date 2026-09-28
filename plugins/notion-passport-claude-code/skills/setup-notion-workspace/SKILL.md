@@ -1,89 +1,60 @@
 ---
 name: setup-notion-workspace
 description: >-
-  Bind the current project/directory to its OWN Notion workspace by adding a
-  uniquely-named, local-scope Notion MCP server that authenticates via the
-  /mcp OAuth redirect flow. Use this whenever the user wants per-project (or
-  per-directory) Notion connections, a different Notion workspace for this repo
-  than another repo, to stop projects from sharing one Notion workspace, or
-  asks to "connect this project to Notion", "프로젝트별 노션 연결", "이 레포에 노션
-  워크스페이스 붙이기", "노션 mcp 프로젝트별로 분리". Trigger even if they don't say "MCP"
-  explicitly — any request to scope a Notion connection to a single project
-  belongs here.
+  Add and manage project-local Notion MCP connections with independent OAuth.
+  Use for connecting this directory to Notion, adding another account or
+  workspace, listing connections, authenticating, choosing a default connection,
+  removing a connection, or taking over a connection made by an earlier version.
+  Applies to requests such as "connect this project to Notion", "이 프로젝트에
+  노션 연결", "노션 워크스페이스 추가", "프로젝트별 노션 연결", and "노션 mcp
+  프로젝트별로 분리", even when MCP is not mentioned. For reading or editing
+  Notion content through existing connections, use use-notion-workspace.
 ---
 
-# Set up a per-project Notion workspace
+# Set up Notion connections
 
-## Why this exists
+Run the plugin script against the user's target directory, defaulting to the
+current working directory. The script uses macOS/Linux system tools and the
+`claude` CLI.
 
-The hosted Notion MCP server (`https://mcp.notion.com/mcp`) authenticates per
-*server entry*, and Claude Code stores each server's OAuth token keyed by the
-**server name** (`{name}|{hash}` in `~/.claude/.credentials.json`). So the path
-to per-project workspaces is simple:
-
-- **Same server name across projects → same OAuth token → same workspace.**
-- **Unique server name per project → independent Authenticate → each can pick a
-  different workspace** in Notion's OAuth consent screen.
-
-The common blocker is the user-scope `notion` plugin: it injects one shared
-`notion` server into *every* project, forcing a single workspace everywhere.
-
-## What the script does
-
-`scripts/setup_notion_workspace.py` makes the current directory's connection
-self-contained:
-
-1. Derives a unique server name from the directory (`notion-<dir>-<hash>`,
-   where `<hash>` is a 4-char digest of the absolute path so two repos with the
-   same directory name don't collide onto one workspace) unless one is given.
-2. Picks a free, fixed OAuth **callback port** (from 8123 up), scanning ports
-   already used by other `notion-*` servers so two projects never collide.
-   A fixed port keeps the OAuth redirect URI stable across restarts.
-3. Warns (without auto-removing) if the global `notion` plugin is present.
-4. Removes any colliding local-scope server (the shared `notion`, or a prior
-   run of this one).
-5. Adds the server at **local scope** (`~/.claude.json`, this project only — not
-   committed to git):
-   `claude mcp add --transport http <name> https://mcp.notion.com/mcp --scope local --callback-port <port>`
-
-## How to run it
-
-From the target project's directory:
-
-```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/skills/setup-notion-workspace/scripts/setup_notion_workspace.py"
+```sh
+sh "${CLAUDE_PLUGIN_ROOT}/scripts/notion-passport.sh" --project "<target-directory>" list
 ```
 
-> `${CLAUDE_PLUGIN_ROOT}` is set automatically when this runs as an installed
-> plugin. If you copied the skill into `~/.claude/skills/` instead, substitute
-> that path: `python3 ~/.claude/skills/setup-notion-workspace/scripts/setup_notion_workspace.py`.
+Each connection is a local-scope MCP server named `notion-<alias>`: it is stored
+in Claude Code's config for that directory only, not committed to git, and has
+its own fixed OAuth callback port. Claude Code keeps OAuth tokens per server
+name, so each connection authenticates separately.
 
-Pass overrides only if the user wants a specific name or port:
+- To add a new connection, run `add` with no argument. Each invocation creates a
+  separate connection with an automatic directory-and-random alias. Capture the
+  alias and server name from the output. If an operation fails, inspect `list`
+  before retrying so that a completed addition is not duplicated.
+- To authenticate, the user opens `/mcp`, selects the new server and chooses
+  **Authenticate**. Alternatively run `login <alias>` from the same target
+  directory; it opens a browser and waits for the result. The browser's Notion
+  account and workspace selection determines what this connection can access;
+  its generated alias does not select a workspace. Let the user complete the
+  interactive authorization.
+- Earlier versions of this plugin created one server per directory, named like
+  `notion-<directory>-<4 hex>`, and did not record it. When `list` lacks such a
+  server that `claude mcp list` shows for this directory, run `adopt <server>`.
+  It keeps the server name, so its authentication and workspace carry over.
+- Use `doctor` to check that Claude Code loads each connection and to see its
+  authentication status. It does not show which workspace was chosen; verify
+  that with a read-only MCP request when the server's tools are available.
+- Use `default <alias>` to record the connection used by the content-routing
+  skill. This does not change any other Notion server.
+- On a request to remove a connection, use `remove <alias>`. It removes the
+  local-scope server and retains OAuth credentials. If the user requests logout
+  as well, run `claude mcp logout <server-name>` in the target directory before
+  removing the connection.
 
-```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/skills/setup-notion-workspace/scripts/setup_notion_workspace.py" notion-myrepo 8130
-```
+Pass `--dry-run` before `add`, `remove`, `default`, or `adopt` when the user
+wants a preview. Prefer the script over running `claude mcp add` or `remove`
+yourself or editing `~/.claude.json`. The shared `notion` plugin and the
+claude.ai Notion connector can coexist with these connections; do not uninstall
+them as part of project setup.
 
-## After running — tell the user the manual steps
-
-These are interactive and the user must do them:
-
-1. **Restart Claude Code** if the global plugin was just uninstalled.
-2. Run `/mcp` → select the new server → **Authenticate**.
-3. In the browser, **choose the Notion workspace** for this project.
-4. In Notion, the pages/DBs to access must have this integration added under
-   `•••` → **Connections**, or fetches will 404.
-
-## One-time cleanup the script will not do for you
-
-If the user agrees to fully drop the shared global plugin (recommended for clean
-per-project management), run it explicitly — it is a global change and also
-removes that plugin's skills:
-
-```bash
-claude plugin uninstall notion@claude-plugins-official
-```
-
-A leftover orphaned token may remain in `~/.claude/.credentials.json` under
-`mcpOAuth` (key starting `plugin:Notion:`). It is harmless; remove the single
-key if the user wants a clean credentials file.
+If a server added during a session is missing from `/mcp`, or its tools stay
+unavailable after authentication, restart Claude Code in the target directory.
