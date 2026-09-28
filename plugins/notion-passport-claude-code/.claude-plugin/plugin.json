@@ -2,8 +2,8 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "notion-passport",
   "displayName": "Notion Passport",
-  "version": "0.0.2",
-  "description": "Connect each project to its own Notion workspace, so different repos don't share a single one.",
+  "version": "0.1.0",
+  "description": "Connect multiple Notion accounts and workspaces to each Claude Code project.",
   "author": {
     "name": "Seungwan Yoo",
     "url": "https://github.com/ysw789"
